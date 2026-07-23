@@ -325,7 +325,7 @@
   }
 
   const iframeReceiverScript = `
-    (${function () {
+    (function receiverInit() {
       function simulateFullClick(target, x, y, button = 0) {
         if (!target) return;
         const opts = {
@@ -368,7 +368,7 @@
         const observer = new MutationObserver((mutations) => {
           mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
-              if (node.tagName === 'IFRAME') {
+              if (node && node.tagName === 'IFRAME') {
                 node.addEventListener('load', () => inject(node));
                 inject(node);
               }
@@ -386,9 +386,8 @@
           if (doc && !doc.querySelector('#xbox-iframe-receiver')) {
             const script = doc.createElement('script');
             script.id = 'xbox-iframe-receiver';
-            script.textContent = '(' + arguments.callee.caller.toString() + ')();';
+            script.textContent = '(' + receiverInit.toString() + ')();';
             (doc.head || doc.body || doc.documentElement).appendChild(script);
-            setupRecursiveFrames(doc);
           }
         } catch (e) {}
       }
@@ -396,6 +395,11 @@
       window.addEventListener('message', (event) => {
         const data = event.data;
         if (!data || data.type !== 'XBOX_ACTION') return;
+
+        const frames = document.querySelectorAll('iframe');
+        frames.forEach(frame => {
+          try { frame.contentWindow?.postMessage(data, '*'); } catch (e) {}
+        });
 
         const rect = window.frameElement ? window.frameElement.getBoundingClientRect() : { left: 0, top: 0 };
         const localX = data.x - rect.left;
@@ -423,7 +427,7 @@
       });
 
       setupRecursiveFrames(document);
-    }.toString()})();
+    })();
   `;
 
   function injectReceiver(iframe) {
@@ -449,7 +453,7 @@
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
-          if (node.tagName === 'IFRAME') {
+          if (node && node.tagName === 'IFRAME') {
             node.addEventListener('load', () => injectReceiver(node));
             injectReceiver(node);
           }
